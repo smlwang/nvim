@@ -3,10 +3,12 @@ local has_words_before = function()
     local line, col = unpack(vim.api.nvim_win_get_cursor(0))
     return col ~= 0 and vim.api.nvim_buf_get_lines(0, line - 1, line, true)[1]:sub(col, col):match("%s") == nil
 end
-
+local feedkey = function(key, mode)
+  vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes(key, true, true, true), mode, true)
+end
 local cmp = require("cmp")
 
-key_map = {
+local key_map = {
     -- Use <C-b/f> to scroll the docs
     ['<C-b>'] = cmp.mapping.scroll_docs(-4),
     ['<C-f>'] = cmp.mapping.scroll_docs(4),
@@ -22,22 +24,22 @@ key_map = {
     -- A super tab
     -- sourc: https://github.com/hrsh7th/nvim-cmp/wiki/Example-mappings#luasnip
     ["<Tab>"] = cmp.mapping(function(fallback)
-        -- Hint: if the completion menu is visible select next one
         if cmp.visible() then
             cmp.select_next_item()
+        elseif vim.fn["vsnip#available"](1) == 1 then
+            feedkey("<Plug>(vsnip-expand-or-jump)", "")
         elseif has_words_before() then
             cmp.complete()
         else
-            fallback()
+            fallback() -- The fallback function sends a already mapped key. In this case, it's probably `<Tab>`.
         end
-    end, { "i", "s" }),     -- i - insert mode; s - select mode
-    ["<S-Tab>"] = cmp.mapping(function(fallback)
+    end, { "i", "s" }),
+
+    ["<S-Tab>"] = cmp.mapping(function()
         if cmp.visible() then
             cmp.select_prev_item()
-        elseif luasnip.jumpable(-1) then
-            luasnip.jump(-1)
-        else
-            fallback()
+        elseif vim.fn["vsnip#jumpable"](-1) == 1 then
+            feedkey("<Plug>(vsnip-jump-prev)", "")
         end
     end, { "i", "s" }),
 }
@@ -79,8 +81,9 @@ cmp.setup({
     sources = cmp.config.sources({
         { name = 'vsnip' },
         { name = 'nvim_lsp' }, -- For nvim-lsp
+    }, {
         { name = 'buffer' },   -- For buffer word completion
-        { name = 'path' },     -- For path completion
+        { name = 'path' }      -- For path completion
     })
 })
 
